@@ -14,14 +14,18 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: "10.0.x"
+          dotnet-version: "10.x"
 
       - name: Restore (locked mode)
         run: dotnet restore Contoso.sln --locked-mode
 
+      - name: Build
+        run: dotnet build --no-restore -c Release /p:ContinuousIntegrationBuild=true
+
       - name: Run tests with coverage (Cobertura) and diagnostic verbosity
         run: |
-          dotnet test --no-restore \
+          dotnet test --no-build \
+            -c Release \
             -bl:test.binlog \
             --results-directory TestResults \
             --coverage \
