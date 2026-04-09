@@ -19,40 +19,10 @@ jobs:
       - name: Restore (locked mode)
         run: dotnet restore Contoso.sln --locked-mode
 
-      - name: Build with binlog
-        run: dotnet build Contoso.sln --no-restore -bl:build.binlog
-
-      - name: Run tests with coverage (XML) and diagnostic verbosity
-        run: |
-          dotnet test --no-build \
-            --results-directory TestResults \
-            --coverage \
-            --coverage-output-format xml \
-            --diagnostic \
-            --diagnostic-file-prefix mtp-diag
-        continue-on-error: true
-
-      - name: Show xml coverage files
-        if: always()
-        run: |
-          echo "=== Searching for xml coverage files ==="
-          find . -path '*/TestResults/*.xml' -type f 2>/dev/null | while read f; do
-            echo "Found: $f ($(stat --printf='%s' "$f") bytes)"
-          done
-
-      - name: Show msCoverageExtensionSourceRootsMapping
-        if: always()
-        run: |
-          echo "=== Searching for .msCoverageExtensionSourceRootsMapping files ==="
-          find . -name '*.msCoverageExtensionSourceRootsMapping' -type f 2>/dev/null | while read f; do
-            echo "--- $f ---"
-            cat "$f"
-            echo
-          done
-
       - name: Run tests with coverage (Cobertura) and diagnostic verbosity
         run: |
-          dotnet test --no-build \
+          dotnet test --no-restore \
+            -bl:test.binlog \
             --results-directory TestResults \
             --coverage \
             --coverage-output-format cobertura \
@@ -84,16 +54,12 @@ jobs:
       - name: Collect all artifacts
         if: always()
         run: |
-          mkdir -p artifacts/coverage
+          mkdir -p artifacts/testresults
           mkdir -p artifacts/binlogs
-          mkdir -p artifacts/diagnostics
           mkdir -p artifacts/source-mapping
 
           # Binlogs
           find . -name '*.binlog' -type f -exec cp {} artifacts/binlogs/ \; 2>/dev/null || true
-
-          # Coverage files (binary + cobertura + converted XML)
-          find . -path '*/TestResults/*.xml' -type f -exec cp {} artifacts/coverage/ \; 2>/dev/null || true
 
           # Source roots mapping
           find . -name '*.msCoverageExtensionSourceRootsMapping' -type f -exec cp {} artifacts/source-mapping/ \; 2>/dev/null || true
@@ -101,8 +67,8 @@ jobs:
           # MTP diagnostic logs
           find . -name 'mtp-diag*' -type f -exec cp {} artifacts/diagnostics/ \; 2>/dev/null || true
 
-          # Any .log files under TestResults
-          find . -path '*/TestResults/*.log' -type f -exec cp {} artifacts/diagnostics/ \; 2>/dev/null || true
+          # TestResults
+          find . -path '*/TestResults/*' -type f -exec cp {} artifacts/testresults/ \; 2>/dev/null || true
 
       - name: Upload artifacts
         if: always()
