@@ -26,13 +26,11 @@ jobs:
       - name: Run tests with coverage (Cobertura) and diagnostic verbosity
         run: |
           dotnet test --no-build \
-            --diag:TestResults/diag.log \
             --results-directory TestResults \
-            -- \
             --coverage \
             --coverage-output-format cobertura \
             --diagnostic \
-            --diagnostic-output-fileprefix mtp-diag
+            --diagnostic-file-prefix mtp-diag
         continue-on-error: true
 
       - name: Show Cobertura XML content
@@ -87,16 +85,6 @@ jobs:
             echo
           done
 
-      - name: Show vstest diagnostic logs
-        if: always()
-        run: |
-          echo "=== vstest diag logs ==="
-          find . -name 'diag*' -path '*/TestResults/*' -type f 2>/dev/null | while read f; do
-            echo "--- $f ---"
-            cat "$f"
-            echo
-          done
-
       - name: Collect all artifacts
         if: always()
         run: |
@@ -118,9 +106,6 @@ jobs:
 
           # MTP diagnostic logs
           find . -name 'mtp-diag*' -type f -exec cp {} artifacts/diagnostics/ \; 2>/dev/null || true
-
-          # vstest diagnostic logs
-          find . -path '*/TestResults/diag*' -type f -exec cp {} artifacts/diagnostics/ \; 2>/dev/null || true
 
           # Any .log files under TestResults
           find . -path '*/TestResults/*.log' -type f -exec cp {} artifacts/diagnostics/ \; 2>/dev/null || true
