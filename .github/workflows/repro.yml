@@ -2,7 +2,6 @@ name: Reproduce Coverage Bug
 
 on:
   push:
-    branches: [main, master]
   pull_request:
   workflow_dispatch:
 
@@ -22,6 +21,34 @@ jobs:
 
       - name: Build with binlog
         run: dotnet build Contoso.sln --no-restore -bl:build.binlog
+
+      - name: Run tests with coverage (XML) and diagnostic verbosity
+        run: |
+          dotnet test --no-build \
+            --results-directory TestResults \
+            --coverage \
+            --coverage-output-format xml \
+            --diagnostic \
+            --diagnostic-file-prefix mtp-diag
+        continue-on-error: true
+
+      - name: Show xml coverage files
+        if: always()
+        run: |
+          echo "=== Searching for xml coverage files ==="
+          find . -path '*/TestResults/*.xml' -type f 2>/dev/null | while read f; do
+            echo "Found: $f ($(stat --printf='%s' "$f") bytes)"
+          done
+
+      - name: Show msCoverageExtensionSourceRootsMapping
+        if: always()
+        run: |
+          echo "=== Searching for .msCoverageExtensionSourceRootsMapping files ==="
+          find . -name '*.msCoverageExtensionSourceRootsMapping' -type f 2>/dev/null | while read f; do
+            echo "--- $f ---"
+            cat "$f"
+            echo
+          done
 
       - name: Run tests with coverage (Cobertura) and diagnostic verbosity
         run: |
@@ -43,46 +70,6 @@ jobs:
             echo
           done
           echo "=== Done ==="
-
-      - name: Run tests with coverage (non-Cobertura) and diagnostic verbosity
-        run: |
-          dotnet test --no-build \
-            --results-directory TestResults \
-            --coverage \
-            --diagnostic \
-            --diagnostic-file-prefix mtp-diag
-        continue-on-error: true
-
-      - name: Show binary .coverage files
-        if: always()
-        run: |
-          echo "=== Searching for .coverage files ==="
-          find . -name '*.coverage' -type f 2>/dev/null | while read f; do
-            echo "Found: $f ($(stat --printf='%s' "$f") bytes)"
-          done
-
-      - name: Convert .coverage to XML for skip-reason inspection
-        if: always()
-        run: |
-          dotnet tool install --global dotnet-coverage || true
-          find . -name '*.coverage' -type f 2>/dev/null | while read f; do
-            out="${f%.coverage}.coverage.xml"
-            echo "Converting $f -> $out"
-            dotnet-coverage merge "$f" -f xml -o "$out" || true
-            echo "--- $out ---"
-            cat "$out" 2>/dev/null || echo "(conversion failed)"
-            echo
-          done
-
-      - name: Show msCoverageExtensionSourceRootsMapping
-        if: always()
-        run: |
-          echo "=== Searching for .msCoverageExtensionSourceRootsMapping files ==="
-          find . -name '*.msCoverageExtensionSourceRootsMapping' -type f 2>/dev/null | while read f; do
-            echo "--- $f ---"
-            cat "$f"
-            echo
-          done
 
       - name: Show MTP diagnostic logs
         if: always()
@@ -106,9 +93,7 @@ jobs:
           find . -name '*.binlog' -type f -exec cp {} artifacts/binlogs/ \; 2>/dev/null || true
 
           # Coverage files (binary + cobertura + converted XML)
-          find . -name '*.coverage' -type f -exec cp {} artifacts/coverage/ \; 2>/dev/null || true
-          find . -name '*.cobertura.xml' -type f -exec cp {} artifacts/coverage/ \; 2>/dev/null || true
-          find . -name '*.coverage.xml' -type f -exec cp {} artifacts/coverage/ \; 2>/dev/null || true
+          find . -path '*/TestResults/*.xml' -type f -exec cp {} artifacts/coverage/ \; 2>/dev/null || true
 
           # Source roots mapping
           find . -name '*.msCoverageExtensionSourceRootsMapping' -type f -exec cp {} artifacts/source-mapping/ \; 2>/dev/null || true
