@@ -29,10 +29,10 @@ test library projects exist, to avoid running multiple test host processes.
 
 ```bash
 # Build
-dotnet build -c Release Contoso.sln
+dotnet build Contoso.sln
 
 # Run tests with Cobertura coverage
-dotnet test --no-build -c Release -- --coverage --coverage-output-format cobertura
+dotnet test --no-build --coverage --coverage-output-format cobertura
 
 # Inspect the Cobertura XML -- <packages /> is empty
 cat src/Contoso.TestHost/bin/Release/net10.0/TestResults/*.cobertura.xml
@@ -51,10 +51,10 @@ The resulting Cobertura XML:
 
 ```bash
 # Produce binary format instead
-dotnet test --no-build -c Release -- --coverage
+dotnet test --no-build --coverage
 
 # Convert to XML to see skip reasons
-dotnet-coverage merge -f xml src/Contoso.TestHost/bin/Release/net10.0/TestResults/*.coverage
+dotnet-coverage merge -f xml src/Contoso.TestHost/bin/Debug/net10.0/TestResults/*.coverage
 ```
 
 This shows ALL assemblies are excluded:
@@ -63,105 +63,3 @@ This shows ALL assemblies are excluded:
 <skipped_module name="contoso.tests.dll" path="contoso.tests.dll" reason="path_is_excluded" />
 <skipped_module name="contoso.testhost.dll" path="contoso.testhost.dll" reason="path_is_excluded" />
 ```
-
-## What Was Tried (None Helped)
-
-### Explicit `--coverage-settings` with XML config
-
-```xml
-<?xml version="1.0" encoding="utf-8"?>
-<Configuration>
-  <ExcludeAssembliesWithoutSources>None</ExcludeAssembliesWithoutSources>
-  <IncludeTestAssembly>True</IncludeTestAssembly>
-  <CodeCoverage>
-    <EnableDynamicManagedInstrumentation>True</EnableDynamicManagedInstrumentation>
-    <ModulePaths>
-      <Include>
-        <ModulePath>.*\.dll$</ModulePath>
-        <ModulePath>.*\.exe$</ModulePath>
-      </Include>
-    </ModulePaths>
-  </CodeCoverage>
-</Configuration>
-```
-
-Running with:
-```bash
-dotnet test -- --coverage --coverage-settings path/to/settings.xml
-```
-
-The settings are **completely ignored** — assemblies are still `path_is_excluded`.
-
-### Explicit `--config-file` with testconfig.json
-
-```json
-{
-  "codeCoverage": {
-    "Configuration": {
-      "Format": "cobertura",
-      "ExcludeAssembliesWithoutSources": "None",
-      "IncludeTestAssembly": true,
-      "CodeCoverage": {
-        "EnableDynamicManagedInstrumentation": true,
-        "ModulePaths": { "Include": [".*\\.dll$"], "Exclude": [] }
-      }
-    }
-  }
-}
-```
-
-Running with:
-```bash
-dotnet test -- --config-file path/to/testconfig.json --coverage --coverage-output-format cobertura
-```
-
-Also **completely ignored**.
-
-### Verbose profiler logging
-
-Enabling profiler logging confirms modules ARE loaded:
-```
-[IM:...]OnModuleLoad: Contoso.TestHost.dll
-[IM:...]OnModuleLoad: Contoso.Tests.dll
-[IM:...]OnModuleLoad: Contoso.Core.dll
-```
-
-The profiler sees the modules, but the post-processing phase marks them as `path_is_excluded`.
-
-### Using `dotnet-coverage collect` as external wrapper
-
-```bash
-dotnet-coverage collect -f cobertura "dotnet test --no-build -c Release"
-```
-
-Fails with "Profiler was not initialized" because the MTP extension's built-in coverage hook
-blocks the external profiler.
-
-### Using `coverlet.MTP` package
-
-Adding `coverlet.MTP` 8.0.1 and using `--coverlet --coverlet-output-format cobertura` produces
-no output files at all (tests pass but no coverage data is generated).
-
-## Root Cause
-
-The `Microsoft.Testing.Extensions.CodeCoverage` MTP extension (18.5.2) has a default setting of
-`ExcludeAssembliesWithoutSources=MissingAll`. Despite the `.msCoverageExtensionSourceRootsMapping`
-file being generated correctly by MSBuild targets (mapping source roots for all referenced
-projects), the coverage post-processor still excludes all assemblies with `path_is_excluded`.
-
-The `--coverage-settings` and `--config-file` flags appear to be non-functional — they do not
-override the built-in defaults.
-
-## Related Issues
-
-- [microsoft/codecoverage#211](https://github.com/microsoft/codecoverage/issues/211) — Empty
-  Cobertura reports (regression from 18.4.1), closed as fixed in 18.5.2 but still reproduces
-- [microsoft/codecoverage#198](https://github.com/microsoft/codecoverage/issues/198) — Empty
-  coverage results when `ContinuousIntegrationBuild=true`
-
-## Environment
-
-- .NET SDK: 10.0.201 (with `rollForward: latestMinor`)
-- TUnit: 1.30.0
-- Microsoft.Testing.Extensions.CodeCoverage: 18.5.2 (transitive from TUnit)
-- OS: tested on Windows 11 Pro (10.0.26200)
