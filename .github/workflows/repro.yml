@@ -44,6 +44,15 @@ jobs:
           done
           echo "=== Done ==="
 
+      - name: Run tests with coverage (non-Cobertura) and diagnostic verbosity
+        run: |
+          dotnet test --no-build \
+            --results-directory TestResults \
+            --coverage \
+            --diagnostic \
+            --diagnostic-file-prefix mtp-diag
+        continue-on-error: true
+
       - name: Show binary .coverage files
         if: always()
         run: |
