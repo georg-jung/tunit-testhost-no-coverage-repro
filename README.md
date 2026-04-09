@@ -161,7 +161,7 @@ override the built-in defaults.
 
 ## Environment
 
-- .NET SDK: 10.0.100 (with `rollForward: latestMinor`)
-- TUnit: 1.23.7
+- .NET SDK: 10.0.201 (with `rollForward: latestMinor`)
+- TUnit: 1.30.0
 - Microsoft.Testing.Extensions.CodeCoverage: 18.5.2 (transitive from TUnit)
 - OS: tested on Windows 11 Pro (10.0.26200)
